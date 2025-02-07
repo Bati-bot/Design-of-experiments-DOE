@@ -7,20 +7,20 @@ strata = [
         "population": 10000,  # N_h
         "sample": 1000,       # n_h
         "responses": 200,     # Number of responses
-        "leaders": 50         # Number of leaders
+        "class": 50         # Number of class
     },
     {
         "population": 20000,  # N_h
         "sample": 2000,       # n_h
         "responses": 500,     # Number of responses
-        "leaders": 100        # Number of leaders
+        "class": 100        # Number of class
     }
 ]
 
 # Total population
 total_population = sum(stratum["population"] for stratum in strata)
 
-# Calculate the proportion of leaders and variance for each stratum
+# Calculate the proportion of class and variance for each stratum
 estimated_proportion = 0
 variance = 0
 
@@ -28,10 +28,10 @@ for stratum in strata:
     N_h = stratum["population"]
     n_h = stratum["sample"]
     responses = stratum["responses"]
-    leaders = stratum["leaders"]
+    class = stratum["class"]
     
-    # Proportion of leaders in the stratum
-    p_h = leaders / responses
+    # Proportion of class in the stratum
+    p_h = class / responses
     
     # Weight for the stratum
     weight = N_h / total_population
@@ -52,5 +52,5 @@ ci_lower = estimated_proportion - z_value * standard_error
 ci_upper = estimated_proportion + z_value * standard_error
 
 # Print results
-print(f"Estimated proportion of leaders: {estimated_proportion:.4f}")
+print(f"Estimated proportion of class: {estimated_proportion:.4f}")
 print(f"95% Confidence Interval: ({ci_lower:.4f}, {ci_upper:.4f})")
