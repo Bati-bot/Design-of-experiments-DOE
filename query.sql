@@ -1,49 +1,63 @@
 WITH datos AS (
     SELECT
         fundraiser_country_iso,  -- Agrupa por país
-        SUM(purchase_donation_amount_usd) AS X,  -- Suma de montos por país
-        COUNT(checkout_vent_id) AS Y             -- Conteo de checkouts por país
+        purchase_donation_amount_usd AS X,  -- Monto de la compra/donación
+        CASE 
+            WHEN checkout_vent_id IS NOT NULL THEN 1 
+            ELSE 0 
+        END AS Y  -- Indicador de checkout (1 si hay checkout, 0 si no)
     FROM
         tu_tabla
-    GROUP BY
-        fundraiser_country_iso  -- Agrupa por país
 ),
 ratios AS (
     SELECT
         fundraiser_country_iso,
-        X / Y AS ratio  -- Calcula la ratio X/Y para cada país
+        SUM(X) AS total_X,  -- Suma de montos por país
+        SUM(Y) AS total_Y,  -- Conteo de checkouts por país
+        SUM(X) / SUM(Y) AS ratio  -- Ratio X/Y para cada país
     FROM
         datos
+    GROUP BY
+        fundraiser_country_iso
+),
+covarianza AS (
+    SELECT
+        fundraiser_country_iso,
+        AVG(X * Y) - AVG(X) * AVG(Y) AS cov_XY  -- Covarianza entre X e Y por país
+    FROM
+        datos
+    GROUP BY
+        fundraiser_country_iso
 ),
 estadisticas AS (
     SELECT
-        fundraiser_country_iso,
-        AVG(X) AS mu_X,          -- Media de X por país
-        AVG(Y) AS mu_Y,          -- Media de Y por país
-        VARIANCE(X) AS var_X,    -- Varianza de X por país
-        VARIANCE(Y) AS var_Y,    -- Varianza de Y por país
-        COVAR_POP(X, Y) AS cov_XY, -- Covarianza entre X e Y por país
-        AVG(ratio) AS media_ratio -- Media de la ratio X/Y por país
+        ratios.fundraiser_country_iso,
+        ratios.total_X / ratios.total_Y AS media_ratio,  -- Media de la ratio X/Y por país
+        VARIANCE(datos.X) AS var_X,  -- Varianza de X por país
+        VARIANCE(datos.Y) AS var_Y,  -- Varianza de Y por país
+        covarianza.cov_XY  -- Covarianza entre X e Y por país
     FROM
-        datos
+        ratios
     JOIN
-        ratios ON datos.fundraiser_country_iso = ratios.fundraiser_country_iso
+        datos ON ratios.fundraiser_country_iso = datos.fundraiser_country_iso
+    JOIN
+        covarianza ON ratios.fundraiser_country_iso = covarianza.fundraiser_country_iso
     GROUP BY
-        fundraiser_country_iso  -- Agrupa por país
+        ratios.fundraiser_country_iso, ratios.total_X, ratios.total_Y, covarianza.cov_XY
 )
 SELECT
     fundraiser_country_iso,
     media_ratio,  -- Media de la ratio X/Y por país
     -- Calcula la varianza de la ratio (Var(R)) por país
-    (var_X / POWER(mu_Y, 2)) 
-    + (POWER(mu_X, 2) * var_Y / POWER(mu_Y, 4)) 
-    - (2 * mu_X * cov_XY / POWER(mu_Y, 3)) AS var_R,
+    (var_X / POWER(total_Y, 2)) 
+    + (POWER(total_X, 2) * var_Y / POWER(total_Y, 4)) 
+    - (2 * total_X * cov_XY / POWER(total_Y, 3)) AS var_R,
     
     -- Calcula el desvío estándar de la ratio (std(R)) por país
     SQRT(
-        (var_X / POWER(mu_Y, 2)) 
-        + (POWER(mu_X, 2) * var_Y / POWER(mu_Y, 4)) 
-        - (2 * mu_X * cov_XY / POWER(mu_Y, 3))
+        (var_X / POWER(total_Y, 2)) 
+        + (POWER(total_X, 2) * var_Y / POWER(total_Y, 4)) 
+        - (2 * total_X * cov_XY / POWER(total_Y, 3))
     ) AS std_R
 FROM
     estadisticas;
